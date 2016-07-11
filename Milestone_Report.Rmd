@@ -1,0 +1,178 @@
+---
+title: "Milestone Report"
+author: "Fan Wang"
+date: "June 5, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Getting and Cleaning the Data
+
+Download data and Load it in R.
+
+You can download data from this website:
+[Capstone Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+For the project, we will be using the English dataset. 
+```{r}
+blogs_file <- "./final/en_US/en_US.blogs.txt"
+news_file <- "./final/en_US/en_US.news.txt"
+twitter_file <- "./final/en_US/en_US.twitter.txt"
+if (!file.exists(blogs_file) || !file.exists(news_file) || !file.exists(twitter_file)) {
+        if (!file.exists("Coursera-SwiftKey.zip")) {
+                download.file(url = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", destfile = "Coursera-SwiftKey.zip", quiet = TRUE)
+        }
+        unzip("Coursera-SwiftKey.zip")
+}
+```
+
+##Basic summaries of the data files
+
+A data table will be created. It contains basic summaries of the three data files, such as file name, file size, line count and word count.
+```{r}
+datafolder <- "./final/en_US/"
+list.files(path = datafolder, pattern = "*.txt")
+```
+
+File size in Mb
+```{r}
+blogs_size <- round(file.info(blogs_file)$size/1024^2, 2)
+news_size <- round(file.info(news_file)$size/1024^2, 2)
+twitter_size <- round(file.info(twitter_file)$size/1024^2, 2)
+```
+
+Line counts
+```{r}
+suppressWarnings(suppressMessages(library(R.utils)))
+blogs_lines <- countLines(blogs_file)
+news_lines <- countLines(news_file)
+twitter_lines <- countLines(twitter_file)
+```
+
+Word counts
+```{r}
+conn_blogs <- file(blogs_file, open = "r")
+conn_news <- file(news_file, open = "r")
+conn_twitter <- file(twitter_file, open = "r")
+blogs <- readLines(conn_blogs)
+news <- readLines(conn_news)
+twitter <- readLines(conn_twitter)
+blogs_wc <- sum(sapply(strsplit(blogs, " "), length))
+news_wc <- sum(sapply(strsplit(news, " "), length))
+twitter_wc <- sum(sapply(strsplit(twitter, " "), length))
+close(conn_blogs)
+close(conn_news)
+close(conn_twitter)
+```
+
+Create data table
+```{r}
+suppressWarnings(library(data.table))
+data.table("datafile" = c("blogs", "news", "twitter"), "size" = c(blogs_size, news_size, twitter_size), "Number of lines" = c(blogs_lines, news_lines, twitter_lines), "Number of words" = c(blogs_wc, news_wc, twitter_wc))
+```
+
+##Sampling the data
+
+The above summary shows that the original dataset are rather large. Therefore, for each dataset, We will be creating a separate sub-sample dataset, which should also give an accurate approximation to results that would be obtained using all the data. We can use rbinom function to create the sample dataset. To reduce the complexity, we will remove all non-English characters.
+```{r}
+dir.create("newsample", showWarnings = FALSE)
+set.seed(511)
+blogs <- iconv(blogs, "latin1", "ASCII", sub="")
+blog_sample <- blogs[rbinom(length(blogs)*0.05, length(blogs), prob = 0.5)]
+write(blog_sample, file = "./newsample/blogs.txt")
+news <- iconv(news, "latin1", "ASCII", sub="")
+new_sample <- news[rbinom(length(news)*0.05, length(news), prob = 0.5)]
+write(new_sample, file = "./newsample/news.txt")
+twitter <- iconv(twitter, "latin1", "ASCII", sub="")
+twitt_sample <- twitter[rbinom(length(twitter)*0.05, length(twitter), prob = 0.5)]
+write(twitt_sample, file = "./newsample/twitter.txt")
+```
+
+Combine all three sample dataset into one dataset named sampleData, and write it out to a text file.
+```{r}
+sampleData <- c(blog_sample, new_sample, twitt_sample)
+write(sampleData, file = "./newsample/sampledata.txt")
+```
+
+##Data cleaning
+
+The goal of this task is to clean the data by removing special characters, numbers, punctuations, extra white spaces, and offensive words and words of profane meaning. We will use a file that contains a list of bad words. It is avialble for download at: http://www.cs.cmu.edu/~biglou/resources/bad-words.txt
+```{r}
+suppressMessages(suppressWarnings(library(tm)))
+
+if (!file.exists("./newsample/bad_words.txt")) {
+        download.file(url = "http://www.cs.cmu.edu/~biglou/resources/bad-words.txt", destfile = "./newsample/bad_words.txt", quiet = TRUE)
+}
+conn_badwords <- file("./newsample/bad_words.txt", open = "r")
+badwords <- readLines(conn_badwords)
+close(conn_badwords)
+
+tokenFunction <- function(x) {
+        x <- removeNumbers(x)
+        x <- removePunctuation(x)
+        x <- tolower(x)
+        x <- str_replace_all(x, "[^[:alnum:]]", " ")
+        x <- removeWords(x, badwords)
+        x <- stripWhitespace(x)
+        return(unlist(x))
+}
+
+tokenData <- tokenFunction(sampleData)
+write(tokenData, file = "./newsample/tokendata.txt")
+```
+
+Let's take a look at summary of the new data set.
+```{r}
+data.table("lines" = length(tokenData), "words" =  sum(sapply(strsplit(tokenData, " "), length)))
+```
+
+##Exploratory data analysis
+
+In this session, We will be exploring the distribution of words and relationship between the words in the corpora. We will also be creating figures and tables to understand variation in the frequencies of words and word pairs in the data.
+We will see some most common unigrams, bigrams and trigrams in this dataset.
+
+Top 20 frequent Unigrams
+```{r}
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(rJava)))
+suppressMessages(suppressWarnings(library(RWeka)))
+unigrams <- NGramTokenizer(tokenData, Weka_control(min = 1, max = 1))
+df_unigrams <- data.frame(table(unigrams))
+top20_unigrams <- df_unigrams[order(df_unigrams$Freq, decreasing = TRUE), ][1:20, ]
+colnames(top20_unigrams) <- c("Word", "Frequency")
+ggplot(top20_unigrams, aes(x=reorder(Word, -Frequency), y=Frequency)) + geom_bar(stat = "Identity", fill="blue") + geom_text(aes(label=Frequency), vjust = -0.2) + ggtitle("Top 20 Common Unigrams") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Word") + ylab("Frequency")
+```
+
+Top 20 frequent Bigrams
+```{r}
+bigrams <- NGramTokenizer(tokenData, Weka_control(min = 2, max = 2))
+df_bigrams <- data.frame(table(bigrams))
+top20_bigrams <- df_bigrams[order(df_bigrams$Freq, decreasing = TRUE), ][1:20, ]
+colnames(top20_bigrams) <- c("Word", "Frequency")
+ggplot(top20_bigrams, aes(x=reorder(Word, -Frequency), y=Frequency)) + geom_bar(stat = "Identity", fill="red") + geom_text(aes(label=Frequency), vjust = -0.2) + ggtitle("Top 20 Common Bigrams") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Word") + ylab("Frequency")
+```
+
+Top 20 frequent Trigrams
+```{r}
+trigrams <- NGramTokenizer(tokenData, Weka_control(min = 3, max = 3))
+df_trigrams <- data.frame(table(trigrams))
+top20_trigrams <- df_trigrams[order(df_trigrams$Freq, decreasing = TRUE), ][1:20, ]
+colnames(top20_trigrams) <- c("Word", "Frequency")
+top20_trigrams
+ggplot(top20_trigrams, aes(x=reorder(Word, -Frequency), y=Frequency)) + geom_bar(stat = "Identity", fill="purple") + geom_text(aes(label=Frequency), vjust = -0.2) + ggtitle("Top 20 Common Trigrams") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Word") + ylab("Frequency")
+```
+
+##My plan for creating a prediction algorithm and Shiny app
+
+The next step of capstone project will be to build a prediction model. It will be based on the analysis of n-grams frequency we have completed above. There are a few things to be considered in order to improve the accuracy of the prediction:
+
+1. How many unique words do we need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+
+2. In this milestone analysis, we have used the ASCII string encoding. For building prediction model, we need to handle and evaluate foreign languages.
+
+3. Evaluate the model for efficiency and accuracy, as we need to build a high efficient model but not to exhuast computer resources.
+
+The Shiny app should be able to accept an n-gram and predict the next word. I am planing to download swiftkey app on my phone just to see how it interact with the user. The document needs to be easy to understand, so users can quickly use the app.

@@ -1,0 +1,65 @@
+Word Prediction
+========================================================
+author: Fan Wang
+date: July 7th, 2016
+autosize: true
+Coursera Data Science Capstone Project
+
+Johns Hopkins University
+
+About the Capstone Project
+========================================================
+<font size=6>
+
+* <font  color="#337ab7">Objectives</font>
+
+The main goal of this project is to use data science to build a word prediction model and create a Shiny app, which can accept a phrase from user and output the next word.
+
+* <font  color="#337ab7">Tasks to be completed</font>
+
+Getting and cleaning the data, exploratory analysis, build a prediction model, create shiny app, and publish the slide deck on RPub.
+
+* <font  color="#337ab7">Source data</font>
+
+The data is from a corpus called [HC Corpora](www.corpora.heliohost.org).
+It consists of three data files collected from different websites: Blog, Newspaper, and twitter.
+
+</font>
+
+Build N-gram Model
+========================================================
+<font size=6>
+
+I took 5% of sample data from each data file and combined them into one dataset. Then, I cleaned the sample data by removing punctuation, special characters, profanity, extra white space, and converting them to lowercase letters. 
+
+After the sample data was cleaned, it was then tokenized into three N-gram files: bigrams, trigrams, and quadgrams. I used the NLP techniques, including tm and RWeka. The words were organized in a frequency sorted dictionary with the most frequent phrases on the top of list. The resulting data frame was used to create the prediction algorithm.
+
+</font>
+
+Word Prediction Algorithm
+========================================================
+Following is the description of the algorithm used to predict the next word.
+
+<font size=5>
+
+1. Receive the input phrase from user.
+2. Remove punctuations, special characters, extra white space, convert all characters to lowercase. Then, it is splitted into separate words.
+3. Always search the word in a higher N-gram first, and apply reduction factor (0.4^n) when searching in lower N-gram data frame.
+4. For example, when user enters a phrase consists of 3 words, the algorithm first looks up the next word in quad-grams and saves the result with probability for each word predicted. Next, it does the same thing for tri-grams and bi-grams, with probability multiply by 0.4 and 0.16, respectively.
+5. All the predictions will be put together and sorted desc based on the probability calculated above. The one with highest probablity will be output as the predicted word, other predictions with lower probability will be output as suggested words.
+
+</font>
+
+How to use the app
+========================================================
+<font size=6>
+
+To use [this app](https://fanwang.shinyapps.io/WordPrediction/), simply type a phrase in the input box, and hit the Go button.
+
+It will then output the word (text color red) that appears most frequently in my N-gram Model as the predicted word.
+
+It will also suggest other words (text color blue) that has lower probability than the above predicted word.
+
+</font>
+
+![WordPrediction](WordPrediction.PNG)
